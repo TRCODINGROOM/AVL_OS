@@ -1,6 +1,6 @@
 # AVL OS
 
-A desktop-style operating system interface that runs as an app. It has a lock screen, windows, a taskbar, Notes, Terminal, Files, Settings, a working web browser and the AVL Store, where you can add apps to your desktop.
+A full operating system with the essentials like a kernel, drivers, IO, a GUI and memory management.
 
 ## Notes
 
