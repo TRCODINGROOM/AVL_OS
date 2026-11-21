@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>AVL OS</title>
+<style>
+:root{color-scheme:dark;--bg:#070b11;--panel:#0f151d;--panel2:#141c26;--line:#1f2a38;--tx:#e8f4f8;--mute:#8195a8;--ac:#22d3ee;--acd:#134e5a}
+*{box-sizing:border-box;margin:0}
+html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--tx);font:14px/1.4 Inter,system-ui,-apple-system,"Segoe UI",sans-serif}
+button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
+#wall{position:absolute;inset:0;background:radial-gradient(ellipse at 50% 40%,#0d1620,#05080d)}
+#wall svg{position:absolute;top:30%;left:0;width:100%;height:40%;filter:blur(1px)}
+#lock{position:absolute;inset:0;z-index:9999;background:radial-gradient(circle at 50% 45%,#0f1a22,#0a0e14 60%);display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;transition:opacity .4s}
+#lock.off{opacity:0;pointer-events:none}
+#lock .brand{position:absolute;top:28px;left:30px;color:var(--mute);font-weight:600;letter-spacing:.06em}
+#lt{font-size:clamp(64px,14vw,120px);font-weight:200;letter-spacing:.02em}
+#lt i{color:var(--ac);font-style:normal;text-shadow:0 0 18px var(--ac)}
+#ld{color:var(--mute);font-size:18px;margin-top:4px}
+#lh{position:absolute;bottom:12%;color:var(--mute);text-align:center}
+#desk{position:absolute;inset:0 0 48px 0;padding:24px 22px;display:flex;flex-direction:column;flex-wrap:wrap;align-content:flex-start;gap:18px}
+.ic{width:76px;display:flex;flex-direction:column;align-items:center;gap:6px;font-size:12px;font-weight:600}
+.tile{width:46px;height:46px;border-radius:12px;background:#0f1a24;border:1px solid var(--line);color:var(--ac);display:grid;place-items:center;font-size:21px}
+.ic:hover .tile{border-color:var(--ac)}
+#bar{position:absolute;left:0;right:0;bottom:0;height:48px;background:#0c1219;border-top:1px solid var(--line);display:flex;align-items:center;padding:0 14px;gap:10px;padding-bottom:env(safe-area-inset-bottom,0)}
+#start{color:var(--ac);font-size:20px}
+#tasks{display:flex;gap:6px;flex:1;overflow:hidden}
+.tb{padding:6px 12px;border-radius:8px;background:var(--panel2);white-space:nowrap}
+.tb.act{outline:1px solid var(--acd)}
+#tray{display:flex;gap:12px;align-items:center;color:var(--mute);font-size:13px;text-align:right}
+#clock b{display:block;color:var(--tx);font-size:13px}
+#menu{position:absolute;left:10px;bottom:56px;width:260px;background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:10px;display:none;z-index:9000}
+#menu button{display:flex;gap:10px;align-items:center;width:100%;padding:9px;border-radius:8px;text-align:left}
+#menu button:hover{background:var(--panel2)}
+.win{position:absolute;background:rgba(15,21,29,.96);border:1px solid var(--line);border-radius:14px;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.5);min-width:280px;min-height:200px;max-width:100vw}
+.wh{display:flex;justify-content:space-between;align-items:center;padding:11px 16px;color:var(--mute);border-bottom:1px solid var(--line);cursor:move;touch-action:none;user-select:none}
+.wh button{padding:0 8px;font-size:16px;color:var(--mute)}
+.wh button:hover{color:var(--tx)}
+.wb{flex:1;overflow:auto;min-height:0;display:flex;flex-direction:column}
+input,textarea{font:inherit;color:var(--tx);background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:9px 12px;outline:none}
+input:focus,textarea:focus{border-color:var(--ac)}
+.pill{background:var(--acd);color:var(--ac);border-radius:999px;padding:5px 14px;font-weight:600}
+.row{display:flex;justify-content:space-between;align-items:center;padding:10px 12px;border-radius:8px}
+.row.on{background:#12444d;color:var(--ac)}
+.sec{background:var(--panel2);border-radius:12px;padding:12px;margin:0 16px 14px}
+.mute{color:var(--mute)}
+.cat{display:flex;gap:8px;overflow-x:auto;padding:0 16px 10px}
+.cat button{padding:5px 14px;border-radius:999px;background:var(--panel2);color:var(--mute);white-space:nowrap}
+.cat button.on{background:var(--acd);color:var(--ac)}
+.app{display:flex;align-items:center;gap:14px;padding:12px 16px}
+.app .tile{width:44px;height:44px;font-weight:700}
+.app div:nth-child(2){flex:1}
+#term{padding:14px;font:13px/1.6 ui-monospace,Menlo,Consolas,monospace;color:#a5e4f2}
+.tin{display:flex;gap:8px;padding:10px 14px;border-top:1px solid var(--line);font-family:ui-monospace,Menlo,Consolas,monospace}
+.tin input{flex:1;border:0;background:none;padding:0;color:#a5e4f2}
+.tool{display:flex;gap:6px;padding:8px 12px}
+.tool input{flex:1}
+.tool button{padding:6px 11px;border-radius:8px;background:var(--panel2)}
+iframe,webview{flex:1;border:0;background:#fff;width:100%}
+.fold{display:flex;flex-wrap:wrap;gap:20px;padding:16px}
+@media(max-width:600px){#tray span{display:none}}
+@media(prefers-reduced-motion:reduce){*{transition:none!important}}
+</style></head><body>
+<div id="wall"><svg viewBox="0 0 1200 300" preserveAspectRatio="none">
+<defs><linearGradient id="g" x1="0" x2="1"><stop offset="0" stop-color="#3ee0b8"/><stop offset=".5" stop-color="#2f8fd8"/><stop offset="1" stop-color="#2447c9"/></linearGradient></defs>
+<g fill="none" stroke="url(#g)" stroke-width="1.4" opacity=".7">
+<path d="M0 200C200 220 260 60 480 110S760 230 940 170 1120 70 1200 90"/><path d="M0 190C200 215 270 75 480 120S760 220 940 160 1120 80 1200 100"/>
+<path d="M0 180C200 205 280 90 480 130S760 210 940 150 1120 90 1200 110"/><path d="M0 210C220 230 250 50 480 100S780 240 940 180 1120 60 1200 80"/>
+<path d="M0 170C200 195 290 105 480 140S760 200 940 140 1120 100 1200 120"/><path d="M0 220C230 240 240 40 480 90S790 250 940 190 1120 50 1200 70"/></g></svg></div>
+<div id="desk"></div>
+<div id="menu"></div>
+<div id="bar"><button id="start" aria-label="Start menu">▦</button><div id="tasks"></div>
+<div id="tray"><span>Wi‑Fi ◉</span><span>Sound ◖</span><div id="clock"><b>--:--</b><small class="mute"></small></div></div></div>
+<div id="lock"><div class="brand">AVL.OS</div><div id="lt"></div><div id="ld"></div><div id="lh">🔒<br>Click anywhere to unlock</div></div>
+<script>
+const $=s=>document.querySelector(s),el=(t,c,h)=>{const e=document.createElement(t);if(c)e.className=c;if(h!=null)e.innerHTML=h;return e};
+const pad=n=>String(n).padStart(2,'0');
+function tick(){const d=new Date();$('#lt').innerHTML=pad(d.getHours())+'<i>:</i>'+pad(d.getMinutes());
+$('#ld').textContent=d.toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric'});
+$('#clock').innerHTML='<b>'+pad(d.getHours())+':'+pad(d.getMinutes())+'</b><small class="mute">'+d.toLocaleDateString('en-US',{month:'short',day:'numeric'})+'</small>'}
+tick();setInterval(tick,10000);
+$('#lock').onclick=()=>$('#lock').classList.add('off');
+let store=null;try{store=window.localStorage}catch(e){}
+const sget=(k,d)=>{try{const v=store&&store.getItem(k);return v==null?d:JSON.parse(v)}catch(e){return d}};
+const sset=(k,v)=>{try{store&&store.setItem(k,JSON.stringify(v))}catch(e){}};
+
+/* window manager */
+const wins={};let z=10,n=0;
+function openApp(id,arg){
+  const a=APPS[id];if(!a)return;
+  if(wins[id]){const w=wins[id];w.el.style.display='flex';focus(id);if(arg&&w.nav)w.nav(arg);return}
+  const w=el('div','win'),wh=el('div','wh','<span>'+a.t+'</span><span><button title="Minimize">–</button><button title="Close">✕</button></span>'),wb=el('div','wb');
+  const W=Math.min(a.w||620,innerWidth-16),H=Math.min(a.h||430,innerHeight-70);
+  Object.assign(w.style,{width:W+'px',height:H+'px',left:Math.max(8,Math.min(130+n*28,innerWidth-W-8))+'px',top:(30+n*24)%120+'px'});n=(n+1)%6;
+  w.append(wh,wb);document.body.append(w);
+  const tb=el('button','tb',a.t);$('#tasks').append(tb);
+  const rec=wins[id]={el:w,tb};
+  tb.onclick=()=>{w.style.display==='none'||tb.classList.contains('act')?(w.style.display==='none'?(w.style.display='flex',focus(id)):(w.style.display='none',tb.classList.remove('act'))):focus(id)};
+  const [mn,cl]=wh.querySelectorAll('button');
+  mn.onclick=()=>{w.style.display='none';tb.classList.remove('act')};
+  cl.onclick=()=>{w.remove();tb.remove();delete wins[id]};
+  let dx,dy,drag=false;
+  wh.onpointerdown=e=>{if(e.target.closest('button'))return;drag=true;dx=e.clientX-w.offsetLeft;dy=e.clientY-w.offsetTop;wh.setPointerCapture(e.pointerId);focus(id)};
+  wh.onpointermove=e=>{if(drag){w.style.left=Math.max(-W+80,Math.min(e.clientX-dx,innerWidth-80))+'px';w.style.top=Math.max(0,Math.min(e.clientY-dy,innerHeight-100))+'px'}};
+  wh.onpointerup=()=>drag=false;
+  w.onpointerdown=()=>focus(id);
+  a.f(wb,rec,arg);focus(id);$('#menu').style.display='none';
+}
+function focus(id){z++;wins[id].el.style.zIndex=z;for(const k in wins)wins[k].tb.classList.toggle('act',k===id)}
+
+/* apps */
+const APPS={
+notes:{t:'Notes',i:'▤',w:560,f(b){const t=el('input');t.placeholder='Untitled Note';t.value=sget('avl.nt','');t.style.cssText='margin:12px;';
+ const x=el('textarea');x.style.cssText='flex:1;margin:0 12px 12px;resize:none;font-family:ui-monospace,Menlo,Consolas,monospace';x.value=sget('avl.nb','Welcome to AVL.OS Notes\n\nStart typing your ideas here...');
+ t.oninput=()=>sset('avl.nt',t.value);x.oninput=()=>sset('avl.nb',x.value);b.append(t,x)}},
+terminal:{t:'Terminal',i:'>_',w:620,f(b){const o=el('div');o.id='term';o.style.flex='1';o.style.overflow='auto';
+ o.innerHTML='AVL.OS Terminal v1.0.0<br>Type "help" for available commands.<br>';
+ const r=el('div','tin','<span style="color:var(--ac)">$</span>'),i=el('input');i.placeholder='Type a command...';r.append(i);b.append(o,r);
+ const cmds={help:()=>'Available commands: help, about, version, clear, date, whoami, ls, pwd, echo',about:()=>'AVL.OS, a desktop that runs in your browser.',version:()=>'AVL.OS v1.0.0',date:()=>new Date().toString(),whoami:()=>'guest',ls:()=>'Documents  Downloads  Projects',pwd:()=>'/home/guest',clear:()=>{o.innerHTML='';return ''}};
+ i.onkeydown=e=>{if(e.key!=='Enter')return;const v=i.value.trim();i.value='';if(!v)return;o.append(el('div','',"$ "+v.replace(/</g,'&lt;')));const[c,...r]=v.split(' ');
+  const m=c==='echo'?r.join(' '):cmds[c]?cmds[c]():'Command not found: '+c+'. Type "help".';if(m){const d=el('div');d.textContent=m;o.append(d)}o.scrollTop=o.scrollHeight};setTimeout(()=>i.focus(),50)}},
+settings:{t:'Settings',i:'⚙',w:540,h:470,f(b){
+ const st=sget('avl.set',{wifi:true,bt:false,net:'AVL Fiber'});const nets=[['AVL Fiber',''],['Studio-5G','78%'],['Cafe Guest','61%'],['Laptop-Lab','48%']];
+ const draw=()=>{b.innerHTML='<h2 style="padding:16px;font-size:18px">System Settings</h2>';
+  const w=el('div','sec','<div class="row"><b>Wi‑Fi</b><button class="pill" id="w">'+(st.wifi?'On':'Off')+'</button></div>');
+  if(st.wifi)nets.forEach(([nm,s])=>{const r=el('button','row'+(st.net===nm?' on':''),'<span>'+nm+'</span><span class="mute">'+(st.net===nm?'Connected':s)+'</span>');r.style.width='100%';r.onclick=()=>{st.net=nm;sset('avl.set',st);draw()};w.append(r)});
+  const bt=el('div','sec','<div class="row"><b>Bluetooth</b><button class="pill" id="b">'+(st.bt?'On':'Off')+'</button></div>'+(st.bt?'<div class="row"><span>AVL Keyboard</span><span class="mute">Connect</span></div>':''));
+  b.append(w,bt);w.querySelector('#w').onclick=()=>{st.wifi=!st.wifi;sset('avl.set',st);draw()};bt.querySelector('#b').onclick=()=>{st.bt=!st.bt;sset('avl.set',st);draw()}};draw()}},
+files:{t:'Files',i:'🗀',w:640,f(b){const tree={Documents:['Welcome.txt','Ideas.txt'],Downloads:[],Projects:['AVL OS']};let cur=null;
+ const draw=()=>{b.innerHTML='';const top=el('div','tool','<button>←</button><span class="mute" style="padding:6px">Home'+(cur?' / '+cur:'')+'</span>');top.querySelector('button').onclick=()=>{cur=null;draw()};
+  const g=el('div','fold');if(!cur)Object.keys(tree).forEach(k=>{const f=el('button','ic','<div class="tile">🗀</div>'+k);f.onclick=()=>{cur=k;draw()};g.append(f)});
+  else{const items=cur==='Downloads'?Object.keys(installed()).map(k=>STORE.find(s=>s.id===k).n):tree[cur];if(!items.length)g.innerHTML='<span class="mute">This folder is empty.</span>';items.forEach(k=>g.append(el('div','ic','<div class="tile">▤</div>'+k)))}b.append(top,g)};draw()}},
+browser:{t:'Browser',i:'◎',w:760,h:500,f(b,rec,arg){
+ const hist=[];let pos=-1;const bar=el('div','tool','<button id="bk">←</button><button id="fw">→</button><button id="rl">⟳</button>'),u=el('input'),go=el('button','','Go'),ext=el('button','','Open in new tab');
+ u.placeholder='Search or enter a web address';bar.querySelector('#rl').after(u);bar.append(go,ext);
+ const D=location.search.includes('desktop=1'),fr=el(D?'webview':'iframe');if(!D)fr.setAttribute('referrerpolicy','no-referrer');
+ const note=el('div','mute','');note.style.cssText='padding:4px 12px;font-size:12px';note.textContent='Some sites refuse to load inside another page. Use "Open in new tab" for those.';
+ const fix=v=>{v=v.trim();if(/^https?:\/\//i.test(v))return v;if(/^[^\s]+\.[a-z]{2,}(\/.*)?$/i.test(v))return 'https://'+v;return 'https://en.wikipedia.org/w/index.php?search='+encodeURIComponent(v)};
+ const load=(v,push=true)=>{const url=fix(v);u.value=url;fr.src=url;if(push){hist.length=pos+1;hist.push(url);pos++}};
+ rec.nav=load;go.onclick=()=>load(u.value);u.onkeydown=e=>{if(e.key==='Enter')load(u.value)};
+ bar.querySelector('#bk').onclick=()=>{if(pos>0){pos--;load(hist[pos],false)}};bar.querySelector('#fw').onclick=()=>{if(pos<hist.length-1){pos++;load(hist[pos],false)}};
+ bar.querySelector('#rl').onclick=()=>{if(hist[pos])fr.src=hist[pos]};ext.onclick=()=>{if(u.value)window.open(u.value,'_blank','noopener')};
+ b.append(bar,...(D?[]:[note]),fr);load(arg||'https://en.wikipedia.org')}},
+store:{t:'AVL Store',i:'🛍',w:560,h:480,f(b){let cat='All',q='';
+ const s=el('input');s.placeholder='Search apps...';s.style.margin='12px 16px';const cats=['All',...new Set(STORE.map(x=>x.c))],cb=el('div','cat'),ls=el('div');
+ const draw=()=>{cb.innerHTML='';cats.forEach(c=>{const x=el('button',c===cat?'on':'',c);x.onclick=()=>{cat=c;draw()};cb.append(x)});ls.innerHTML='';const ins=installed();
+  STORE.filter(a=>(cat==='All'||a.c===cat)&&a.n.toLowerCase().includes(q)).forEach(a=>{const r=el('div','app','<div class="tile" style="color:'+a.col+'">'+a.n[0]+'</div><div><b>'+a.n+'</b><div class="mute" style="font-size:12px">'+a.d+'</div><div class="mute" style="font-size:12px">★ '+a.r+' · '+a.c+'</div></div>');
+   const g=el('button','pill',ins[a.id]?'Installed':'Get');g.onclick=()=>{const m=installed();if(m[a.id])delete m[a.id];else m[a.id]=1;sset('avl.apps',m);sync();draw()};r.append(g);ls.append(r)})};
+ s.oninput=()=>{q=s.value.toLowerCase();draw()};b.append(s,cb,ls);draw()}}
+};
+const STORE=[
+{id:'yt',n:'YouTube',d:'Watch videos and live streams',c:'Entertainment',r:4.9,col:'#ef4444',u:'https://www.youtube.com'},
+{id:'wa',n:'WhatsApp',d:'Fast, secure messaging',c:'Social',r:4.7,col:'#22c55e',u:'https://web.whatsapp.com'},
+{id:'gv',n:'Google Voice',d:'Voice calling and texting',c:'Communication',r:4.3,col:'#3b82f6',u:'https://voice.google.com'},
+{id:'ig',n:'Instagram',d:'Share photos and stories',c:'Social',r:4.6,col:'#ec4899',u:'https://www.instagram.com'},
+{id:'sp',n:'Spotify',d:'Stream music and podcasts',c:'Music',r:4.8,col:'#22c55e',u:'https://open.spotify.com'},
+{id:'gm',n:'Google Maps',d:'Find places and directions',c:'Navigation',r:4.8,col:'#f59e0b',u:'https://www.google.com/maps'},
+{id:'cg',n:'Claude',d:'Chat with an AI assistant',c:'AI',r:4.9,col:'#22d3ee',u:'https://claude.ai'},
+{id:'wk',n:'Wikipedia',d:'Read the free encyclopedia',c:'Productivity',r:4.7,col:'#e8f4f8',u:'https://en.wikipedia.org'},
+{id:'am',n:'Amazon',d:'Shop for almost anything',c:'Shopping',r:4.5,col:'#f59e0b',u:'https://www.amazon.com'}];
+APPS.store.t='AVL Store';
+const installed=()=>sget('avl.apps',{});
+function sync(){$('#desk').querySelectorAll('.x').forEach(e=>e.remove());const m=installed();STORE.filter(a=>m[a.id]).forEach(a=>{
+ const b=el('button','ic x','<div class="tile" style="color:'+a.col+'">'+a.n[0]+'</div>'+a.n);b.onclick=()=>openApp('browser',a.u);$('#desk').append(b)})}
+['notes','terminal','settings','files','browser','store'].forEach(id=>{const b=el('button','ic','<div class="tile">'+APPS[id].i+'</div>'+({store:'AVL Store'}[id]||APPS[id].t));b.onclick=()=>openApp(id);$('#desk').append(b)});
+sync();
+const menu=$('#menu');['notes','terminal','settings','files','browser','store'].forEach(id=>{const b=el('button','','<span class="tile" style="width:32px;height:32px;font-size:15px">'+APPS[id].i+'</span>'+APPS[id].t);b.onclick=()=>openApp(id);menu.append(b)});
+$('#start').onclick=e=>{e.stopPropagation();menu.style.display=menu.style.display==='block'?'none':'block'};
+document.addEventListener('pointerdown',e=>{if(!e.target.closest('#menu,#start'))menu.style.display='none'});
+</script></body></html>
