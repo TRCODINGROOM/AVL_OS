@@ -27,4 +27,4 @@ Use `npm run start:vm` instead of `npm start`. This turns off the sandbox and GP
 
 ## License
 
-MIT
+GNU AGPL v3.0
