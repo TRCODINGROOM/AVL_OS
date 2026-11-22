@@ -1,6 +1,6 @@
 #include <avlos/network.h>
 #include <avlos/arch_x86_64.h>
-#include "rtl8139.h"
+#include "../drivers/rtl8139.h"
 
 #define ETHERNET_HEADER_SIZE 14u
 #define NETWORK_BUFFER_SIZE 2048u
