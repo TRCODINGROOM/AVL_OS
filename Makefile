@@ -71,7 +71,7 @@ ASM_SOURCES := \
 OBJECTS := \
 	$(patsubst src/%.c,$(OBJ)/%.o,$(C_SOURCES)) \
 	$(patsubst src/%.cpp,$(OBJ)/%.o,$(CXX_SOURCES)) \
-	$(patsubst src/%.asm,$(OBJ)/%.o,$(ASM_SOURCES))
+	$(patsubst src/%.asm,$(OBJ)/%.asm.o,$(ASM_SOURCES))
 DEPS := $(OBJECTS:.o=.d)
 
 -include $(DEPS)
@@ -107,7 +107,7 @@ $(OBJ)/%.o: src/%.cpp
 	mkdir -p $(dir $@)
 	$(CXX) $(CXXFLAGS) -Iinclude -c $< -o $@
 
-$(OBJ)/%.o: src/%.asm
+$(OBJ)/%.asm.o: src/%.asm
 	mkdir -p $(dir $@)
 	$(NASM) -f elf64 -g -F dwarf $< -o $@
 
