@@ -1,0 +1,9 @@
+{
+  "name": "avl-os-desktop",
+  "version": "2.0.0",
+  "description": "AVL OS desktop shell (Electron)",
+  "main": "main.js",
+  "license": "AGPL-3.0-only",
+  "scripts": { "start": "electron .", "start:vm": "electron . --vm" },
+  "devDependencies": { "electron": "33.2.1" }
+}
