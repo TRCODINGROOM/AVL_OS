@@ -25,4 +25,4 @@ Note: a virtual machine has no Wi-Fi hardware. Ethernet works through VMware's N
 
 ## Notes
 - Everything is in RAM in live mode, so changes are lost when you shut down.
-- Licenses: AVL OS code is AGPL-3.0-only. Ubuntu, Linux, Chromium/Electron (MIT/BSD-style) and Inter (SIL OFL) keep their own licenses.
+- Licenses: AVL OS code is GPL-2.0-only. Ubuntu, Linux, Chromium/Electron (MIT/BSD-style) and Inter (SIL OFL) keep their own licenses.
