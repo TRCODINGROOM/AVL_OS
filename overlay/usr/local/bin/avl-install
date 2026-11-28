@@ -1,0 +1,126 @@
+#!/bin/bash
+# AVL OS installer.   avl-install /dev/sdX erase|free --yes
+#   erase : wipe the WHOLE disk and install AVL OS only (UEFI or BIOS)
+#   free  : keep every existing partition, install into the largest unallocated space,
+#           reuse the existing EFI partition and add a "Windows" entry to the boot menu (UEFI + GPT only)
+# Progress is written to /var/log/avl-install.log ("STAGE n|text"), result to /run/avl-install.status.
+set -u
+LOG=/var/log/avl-install.log; ST=/run/avl-install.status; T=/target
+DISK="${1:-}"; MODE="${2:-}"; YES="${3:-}"
+: >"$LOG"; : >"$ST"; exec >>"$LOG" 2>&1
+say(){ echo "STAGE $1|$2"; }
+cleanup(){ sync; umount -R "$T" 2>/dev/null || umount -lR "$T" 2>/dev/null; }
+fail(){ echo "ERROR: $*"; echo "FAIL: $*" >"$ST"; cleanup; exit 1; }
+pn(){ case "$DISK" in *nvme*|*mmcblk*) echo "${DISK}p$1";; *) echo "${DISK}$1";; esac; }
+
+say 1 "Checking the disk"
+[ "$(id -u)" = 0 ] || fail "must run as root"
+[ "$YES" = "--yes" ] || fail "confirmation flag missing"
+[[ "$DISK" =~ ^/dev/(sd[a-z]+|vd[a-z]+|xvd[a-z]+|nvme[0-9]+n[0-9]+|mmcblk[0-9]+)$ ]] || fail "unsupported disk name: $DISK"
+[ -b "$DISK" ] || fail "$DISK is not a disk"
+case "$MODE" in erase|free) ;; *) fail "unknown mode: $MODE";; esac
+grep -q boot=casper /proc/cmdline || fail "the installer only runs from the AVL OS live ISO"
+MED=""; for m in /run/live/medium /cdrom /lib/live/mount/medium; do mountpoint -q "$m" 2>/dev/null && { MED="$m"; break; }; done
+[ -n "$MED" ] && [ -f "$MED/casper/vmlinuz" ] || fail "cannot find the AVL OS boot media"
+MSRC=$(findmnt -no SOURCE "$MED" 2>/dev/null); MPK=$(lsblk -no pkname "$MSRC" 2>/dev/null | head -1)
+[ -z "$MPK" ] || [ "/dev/$MPK" != "$DISK" ] || fail "$DISK holds the installer itself"
+lsblk -nrpo MOUNTPOINTS "$DISK" | grep -q . && fail "a partition on $DISK is in use (mounted)"
+SIZE=$(blockdev --getsize64 "$DISK"); [ "$SIZE" -ge 12884901888 ] || fail "disk is smaller than 12 GiB"
+EFI=0; [ -d /sys/firmware/efi ] && EFI=1
+
+if [ "$MODE" = free ]; then
+  say 2 "Making room in the free space (existing partitions are not changed)"
+  [ "$EFI" = 1 ] || fail "installing alongside another system needs UEFI boot"
+  [ "$(lsblk -dno PTTYPE "$DISK")" = gpt ] || fail "disk is not GPT"
+  ESP=$(lsblk -nrpo NAME,PARTTYPE "$DISK" | awk 'tolower($2)=="c12a7328-f81f-11d2-ba4b-00a0c93ec93b"{print $1; exit}')
+  [ -n "$ESP" ] || fail "no EFI system partition found on $DISK"
+  FREE=$(parted -s -m "$DISK" unit B print free 2>/dev/null | awk -F: '$NF ~ /free/ || $5=="free;" {v=$4; gsub("B","",v); if(v+0>m)m=v+0} END{print m+0}')
+  [ "${FREE:-0}" -ge 12884901888 ] || fail "need at least 12 GiB of unallocated space (found $(( ${FREE:-0} / 1073741824 )) GiB). Shrink a partition in Disk Management first."
+  BEFORE=$(lsblk -nrpo NAME "$DISK" | sort)
+  sgdisk -n 0:0:0 -t 0:8300 -c 0:"AVL OS" "$DISK" || fail "could not create the AVL OS partition"
+  partprobe "$DISK" 2>/dev/null; udevadm settle; sleep 2
+  ROOTP=$(comm -13 <(echo "$BEFORE") <(lsblk -nrpo NAME "$DISK" | sort) | head -1)
+  [ -b "$ROOTP" ] || fail "new partition did not appear"
+else
+  say 2 "Erasing the disk and creating partitions"
+  sgdisk --zap-all "$DISK" >/dev/null 2>&1; wipefs -a "$DISK" >/dev/null 2>&1
+  if [ "$EFI" = 1 ]; then
+    sgdisk -n 1:0:+512M -t 1:ef00 -c 1:"EFI" -n 2:0:0 -t 2:8300 -c 2:"AVL OS" "$DISK" || fail "partitioning failed"
+    ESP=$(pn 1); ROOTP=$(pn 2)
+  else
+    sgdisk -n 1:0:+1M -t 1:ef02 -c 1:"BIOS boot" -n 2:0:0 -t 2:8300 -c 2:"AVL OS" "$DISK" || fail "partitioning failed"
+    ESP=""; ROOTP=$(pn 2)
+  fi
+  partprobe "$DISK" 2>/dev/null; udevadm settle; sleep 2
+  [ -b "$ROOTP" ] || fail "partitions did not appear"
+  [ -z "$ESP" ] || mkfs.vfat -F32 -n AVLEFI "$ESP" >/dev/null || fail "could not format the EFI partition"
+fi
+
+say 3 "Formatting the AVL OS partition"
+mkfs.ext4 -F -q -L AVL_OS "$ROOTP" || fail "could not format $ROOTP"
+mkdir -p "$T"; mount "$ROOTP" "$T" || fail "could not mount $ROOTP"
+if [ -n "${ESP:-}" ]; then mkdir -p "$T/boot/efi"; mount "$ESP" "$T/boot/efi" || fail "could not mount the EFI partition"; fi
+
+say 4 "Copying AVL OS to the disk (a few minutes)"
+mkdir -p "$T"/{proc,sys,dev,run,tmp,mnt,media,boot,cdrom}; chmod 1777 "$T/tmp"
+rsync -aHAXx --exclude=/proc/* --exclude=/sys/* --exclude=/dev/* --exclude=/run/* --exclude=/tmp/* --exclude=/mnt/* --exclude=/media/* \
+  --exclude=/cdrom --exclude=/target --exclude=/boot/* --exclude=/var/log/avl-install.log --exclude=/var/cache/apt \
+  --exclude=/home/avl/.cache --exclude=/home/avl/.config / "$T/" || fail "copying files failed"
+
+say 5 "Setting up the system"
+RUUID=$(blkid -s UUID -o value "$ROOTP")
+{ echo "UUID=$RUUID / ext4 errors=remount-ro 0 1"; [ -n "${ESP:-}" ] && echo "UUID=$(blkid -s UUID -o value "$ESP") /boot/efi vfat umask=0077 0 1"; } >"$T/etc/fstab"
+VER=$(ls "$T/lib/modules" | sort -V | tail -1); [ -n "$VER" ] || fail "no kernel modules found"
+cp "$MED/casper/vmlinuz" "$T/boot/vmlinuz-$VER" || fail "could not copy the kernel"
+for d in dev dev/pts proc run; do mount --bind "/$d" "$T/$d"; done; mount --rbind /sys "$T/sys"
+CH(){ chroot "$T" /usr/bin/env PATH=/usr/sbin:/usr/bin:/sbin:/bin "$@"; }
+CH id avl >/dev/null 2>&1 || CH useradd -m -s /bin/bash -G sudo,audio,video,netdev,plugdev avl
+CH passwd -d avl >/dev/null 2>&1; mkdir -p "$T/home/avl"; CH chown -R avl:avl /home/avl
+echo avlos >"$T/etc/hostname"; touch "$T/etc/avl-installed"
+
+say 6 "Building the boot image"
+CH update-initramfs -c -k "$VER" || fail "could not build the initramfs"
+
+say 7 "Installing the boot menu"
+cat >"$T/etc/default/grub" <<'GR'
+GRUB_DEFAULT=saved
+GRUB_SAVEDEFAULT=false
+GRUB_TIMEOUT_STYLE=menu
+GRUB_TIMEOUT=8
+GRUB_DISTRIBUTOR="AVL OS"
+GRUB_CMDLINE_LINUX_DEFAULT="quiet"
+GRUB_CMDLINE_LINUX=""
+GRUB_DISABLE_OS_PROBER=true
+GR
+if [ "$MODE" = free ] && [ -f "$T/boot/efi/EFI/Microsoft/Boot/bootmgfw.efi" ]; then
+  cat >"$T/etc/grub.d/40_avl_windows" <<'GR'
+#!/bin/sh
+cat <<'EOT'
+menuentry "Windows" --class windows --class os {
+  insmod part_gpt
+  insmod fat
+  insmod chain
+  search --no-floppy --file --set=root /EFI/Microsoft/Boot/bootmgfw.efi
+  chainloader /EFI/Microsoft/Boot/bootmgfw.efi
+}
+EOT
+GR
+  chmod +x "$T/etc/grub.d/40_avl_windows"
+fi
+if [ "$EFI" = 1 ]; then
+  CH grub-install --target=x86_64-efi --efi-directory=/boot/efi --bootloader-id=AVLOS --recheck; R1=$?
+  R2=1; [ "$MODE" = erase ] && { CH grub-install --target=x86_64-efi --efi-directory=/boot/efi --removable --recheck; R2=$?; }
+  [ "$R1" = 0 ] || [ "$R2" = 0 ] || fail "could not install the UEFI boot loader"
+else
+  CH grub-install --target=i386-pc --recheck "$DISK" || fail "could not install the BIOS boot loader"
+fi
+say 8 "Writing the boot menu"
+CH update-grub || fail "could not write the boot menu"
+grep -q "menuentry" "$T/boot/grub/grub.cfg" || fail "boot menu is empty"
+[ "$MODE" != free ] || grep -q 'menuentry "Windows"' "$T/boot/grub/grub.cfg" || echo "NOTE: no Windows entry (Windows boot files not found on the EFI partition)"
+
+say 9 "Finishing up"
+cleanup
+say 10 "Done"
+echo "DONE" >"$ST"
+exit 0

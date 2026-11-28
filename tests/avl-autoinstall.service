@@ -1,0 +1,7 @@
+[Unit]
+Description=AVL OS unattended install (test only)
+ConditionKernelCommandLine=avl.autoinstall
+After=local-fs.target
+[Service]
+Type=oneshot
+ExecStart=/bin/sh -c 'T=$(tr " " "\n" </proc/cmdline | sed -n "s/^avl.autoinstall=//p"); /usr/local/bin/avl-install "${T%%:*}" "${T##*:}" --yes; echo "AVLTEST $(cat /run/avl-install.status)" >/dev/ttyS0; systemctl poweroff'
